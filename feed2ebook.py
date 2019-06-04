@@ -3,13 +3,14 @@ import feedparser
 import os
 import pypandoc
 import sys
+
 from datetime import datetime
 from time import mktime
 
 xml_ascii = lambda x: x.encode('ascii', 'xmlcharrefreplace')
 text_ascii = lambda x: x.encode('ascii', 'replace')
-metadata = lambda title, author, addition: '% ' + title + '\n% ' + author + '\n% ' + addition + '\n\n'
-filename = lambda x: text_ascii(x).replace('/', '-')
+create_metadata = lambda title, author, addition: '% ' + title + '\n% ' + author + '\n% ' + addition + '\n\n'
+to_filename = lambda x: text_ascii(x).replace('/', '-')
 
 def safely_create_dir(path):
     try:
@@ -23,22 +24,22 @@ if len(sys.argv) is not 2:
     exit()
 
 d = feedparser.parse(sys.argv[1])
-feed = d.feed.title
-safely_create_dir(filename(feed))
+feed_title = d.feed.title
+safely_create_dir(to_filename(feed_title))
+
 for item in d.entries:
     title = xml_ascii(item.title)
-    output = "<html><body>\n"
+    output = "<html>\n<body>\n"
     for content in item.content:
         output += xml_ascii(content.value) + "\n"
     else:
         output += xml_ascii(item.description) + "\n"
-    output += "</body></html>\n"
+    output += "</body>\n</html>\n"
 
     # bypass over markdown to add title information without writing extra metadata file
     md_output = pypandoc.convert_text(output, 'markdown', format='html')
-    display_date = item.published
-    md_output = metadata(title, feed, display_date) + md_output
+    md_output = create_metadata(title, feed_title, item.published) + md_output
 
-    name_date = datetime.fromtimestamp(mktime(item.published_parsed)).strftime('%Y-%m-%d')
-    name = feed + '/' + name_date + ' ' + filename(item.title) + '.epub'
+    published = datetime.fromtimestamp(mktime(item.published_parsed)).strftime('%Y-%m-%d')
+    name = feed_title + '/' + published + ' ' + to_filename(item.title) + '.epub'
     pypandoc.convert_text(md_output, 'epub3', format='markdown', outputfile=name)
