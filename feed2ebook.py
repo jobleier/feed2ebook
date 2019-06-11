@@ -4,13 +4,14 @@ import os
 import pypandoc
 import sys
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from time import mktime
 
 xml_ascii = lambda x: x.encode('ascii', 'xmlcharrefreplace')
 text_ascii = lambda x: x.encode('ascii', 'replace')
 create_metadata = lambda title, author, addition: '% ' + title + '\n% ' + author + '\n% ' + addition + '\n\n'
 to_filename = lambda x: text_ascii(x).replace('/', '-')
+timestamp = lambda dt: (dt - datetime(1970, 1, 1)).total_seconds()
 
 def safely_create_dir(path):
     try:
@@ -19,15 +20,8 @@ def safely_create_dir(path):
         if exception.errno != errno.EEXIST:
             raise
 
-if len(sys.argv) is not 2:
-    print "usage: feed2ebook.py <url>"
-    exit()
 
-d = feedparser.parse(sys.argv[1])
-feed_title = d.feed.title
-safely_create_dir(to_filename(feed_title))
-
-for item in d.entries:
+def create_ebook(item, feed_title, feed_folder):
     title = xml_ascii(item.title)
     output = "<html>\n<body>\n"
     for content in item.content:
@@ -41,5 +35,30 @@ for item in d.entries:
     md_output = create_metadata(title, feed_title, item.published) + md_output
 
     published = datetime.fromtimestamp(mktime(item.published_parsed)).strftime('%Y-%m-%d')
-    name = feed_title + '/' + published + ' ' + to_filename(item.title) + '.epub'
+    name = feed_folder + '/' + published + ' ' + to_filename(item.title) + '.epub'
     pypandoc.convert_text(md_output, 'epub3', format='markdown', outputfile=name)
+
+
+if len(sys.argv) is not 2:
+    print "usage: feed2ebook.py <url>"
+    exit()
+
+current_update = datetime.now()
+d = feedparser.parse(sys.argv[1])
+feed_title = d.feed.title
+feed_folder = to_filename(feed_title)
+safely_create_dir(feed_folder)
+
+if os.path.isfile(feed_folder + '/.feed2ebook'):
+    with open(feed_folder + '/.feed2ebook') as persistent:
+        last_update = float(persistent.read())
+else:
+    last_update = timestamp(datetime.min)
+
+for item in d.entries:
+    item_time = mktime(item.published_parsed)
+    if item_time > last_update:
+        create_ebook(item, feed_title, feed_folder)
+
+with open(feed_folder + '/.feed2ebook','w') as persistent:
+    persistent.write(str(timestamp(current_update)))
