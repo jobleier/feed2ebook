@@ -38,27 +38,28 @@ def create_ebook(item, feed_title, feed_folder):
     name = feed_folder + '/' + published + ' ' + to_filename(item.title) + '.epub'
     pypandoc.convert_text(md_output, 'epub3', format='markdown', outputfile=name)
 
+if __name__ == '__main__':
+    if len(sys.argv) is not 2:
+        print "usage: feed2ebook.py <url>"
+        exit()
 
-if len(sys.argv) is not 2:
-    print "usage: feed2ebook.py <url>"
-    exit()
+    current_update = datetime.now()
+    d = feedparser.parse(sys.argv[1])
+    feed_title = d.feed.title
+    feed_folder = to_filename(feed_title)
+    safely_create_dir(feed_folder)
 
-current_update = datetime.now()
-d = feedparser.parse(sys.argv[1])
-feed_title = d.feed.title
-feed_folder = to_filename(feed_title)
-safely_create_dir(feed_folder)
+    if os.path.isfile(feed_folder + '/.feed2ebook'):
+        with open(feed_folder + '/.feed2ebook') as persistent:
+            last_update = float(persistent.read())
+    else:
+        last_update = timestamp(datetime.min)
 
-if os.path.isfile(feed_folder + '/.feed2ebook'):
-    with open(feed_folder + '/.feed2ebook') as persistent:
-        last_update = float(persistent.read())
-else:
-    last_update = timestamp(datetime.min)
+    for item in d.entries:
+        item_time = mktime(item.published_parsed)
+        if item_time > last_update:
+            create_ebook(item, feed_title, feed_folder)
 
-for item in d.entries:
-    item_time = mktime(item.published_parsed)
-    if item_time > last_update:
-        create_ebook(item, feed_title, feed_folder)
+    with open(feed_folder + '/.feed2ebook','w') as persistent:
+        persistent.write(str(timestamp(current_update)))
 
-with open(feed_folder + '/.feed2ebook','w') as persistent:
-    persistent.write(str(timestamp(current_update)))
