@@ -1,3 +1,4 @@
+import argparse
 import errno
 import feedparser
 import os
@@ -54,12 +55,14 @@ def create_ebook(item, feed_title, feed_folder):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) is not 2:
-        print("usage: feed2ebook.py <url>")
-        exit()
+    parser = argparse.ArgumentParser(
+        description='convert feed to separat ebooks')
+    parser.add_argument(
+        'url', type=str, help='file or url of RSS or Atom feed')
+    args = parser.parse_args()
 
     current_update = datetime.now()
-    d = feedparser.parse(sys.argv[1])
+    d = feedparser.parse(args.url)
     feed_title = d.feed.title
     feed_folder = to_filename(feed_title)
     safely_create_dir(feed_folder)
